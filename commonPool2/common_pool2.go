@@ -146,7 +146,7 @@ func (p *CommonPool) Init() {
                 }
             }
             e := queue.Front()
-
+            p.Factory.ActivateObject(e.Value.(poolObject).obj)
             select {
             case <-p.stop:
                 return
@@ -193,13 +193,13 @@ func (p *CommonPool) idleObj(i interface{}) bool {
         return false
     }
 
-    //if _, ok := p.objMap[i]; ok || p.AcceptExternalObj {
     if p.TestWhileIdle {
-        p.Factory.ValidateObject(i)
+        if !p.Factory.ValidateObject(i) {
+            return false
+        }
     }
+    p.Factory.PassivateObject(i)
     return true
-    //}
-    //return false
 }
 
 func (p *CommonPool) destoryObj(i interface{}) {
@@ -212,7 +212,9 @@ func (p *CommonPool) make() interface{} {
     i := p.syncMake()
     if i != nil {
         if p.TestOnCreate {
-            p.Factory.ValidateObject(i)
+            if !p.Factory.ValidateObject(i) {
+                return nil
+            }
         }
     }
     return i
@@ -224,7 +226,9 @@ func (p *CommonPool) Get() interface{} {
         select {
         case ret = <-p.getChan:
             if p.TestOnBorrow {
-                p.Factory.ValidateObject(ret)
+                if !p.Factory.ValidateObject(ret) {
+                    return nil
+                }
             }
             return ret
         default:
@@ -235,7 +239,9 @@ func (p *CommonPool) Get() interface{} {
     if p.MaxWaitMillis == -1 {
         ret := <-p.getChan
         if p.TestOnBorrow {
-            p.Factory.ValidateObject(ret)
+            if !p.Factory.ValidateObject(ret) {
+                return nil
+            }
         }
         return ret
     }
@@ -243,7 +249,9 @@ func (p *CommonPool) Get() interface{} {
     select {
     case ret = <-p.getChan:
         if p.TestOnBorrow {
-            p.Factory.ValidateObject(ret)
+            if !p.Factory.ValidateObject(ret) {
+                return nil
+            }
         }
         return ret
     case <-time.After(p.MaxWaitMillis):
@@ -255,7 +263,9 @@ func (p *CommonPool) Get() interface{} {
 
 func (p *CommonPool) Put(i interface{}) {
     if p.TestOnReturn {
-        p.Factory.ValidateObject(i)
+        if !p.Factory.ValidateObject(i) {
+            return
+        }
     }
     p.putChan <- i
 }
