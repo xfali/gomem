@@ -11,6 +11,8 @@
 package gomem
 
 type Pool interface {
+    Init()
+    Close()
     Get() interface{}
     Put(interface{})
 }

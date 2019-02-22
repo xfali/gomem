@@ -19,7 +19,7 @@ import (
 )
 
 func TestCommonPool(t *testing.T) {
-    cp := commonPool.CommonPool{
+    pb := commonPool.CommonPool{
         MaxIdle: 10,
         MaxSize: 20,
         New: func() interface{} {
@@ -29,7 +29,8 @@ func TestCommonPool(t *testing.T) {
         },
         WaitTimeout: time.Second * 10,
     }
-    pb := cp.Build()
+    pb.Init()
+    defer pb.Close()
 
     l := list.New()
     go func() {

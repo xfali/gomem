@@ -11,7 +11,6 @@
 package commonPool
 
 import (
-    "gomem"
     "math"
     "sync"
     "time"
@@ -29,7 +28,7 @@ type CommonPool struct {
     init bool
 }
 
-func (p *CommonPool) initDefault() {
+func (p *CommonPool) Init() {
     if p.init {
         return
     }
@@ -52,9 +51,8 @@ func (p *CommonPool) initDefault() {
     p.curCount = 0
 }
 
-func (p *CommonPool) Build() gomem.Pool {
-    p.initDefault()
-    return p
+func (p *CommonPool) Close() {
+    //close(p.queue)
 }
 
 func (p *CommonPool) make() interface{} {

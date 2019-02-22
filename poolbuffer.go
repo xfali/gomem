@@ -44,23 +44,6 @@ func (m *Manager) Start() (<-chan interface{}, chan<- interface{}) {
         queue := list.New()
         timer := time.NewTimer(m.interval)
         for {
-            select {
-            case <-m.stop:
-                return
-            case <-timer.C:
-                for e := queue.Front(); e != nil; e = e.Next() {
-                    if time.Since(e.Value.(poolObject).when) > m.interval {
-                        queue.Remove(e)
-                        if m.Delete != nil {
-                            m.Delete(e.Value.(poolObject).obj)
-                        }
-                        e.Value = nil
-                    }
-                }
-                timer = time.NewTimer(m.interval)
-            default:
-            }
-
             if queue.Len() == 0 {
                 queue.PushBack(poolObject{when: time.Now(), obj: m.New()})
             }
@@ -75,6 +58,21 @@ func (m *Manager) Start() (<-chan interface{}, chan<- interface{}) {
             case m.get <- e.Value.(poolObject).obj:
                 //timer.Stop()
                 queue.Remove(e)
+            case <-timer.C:
+                e := queue.Front()
+                next := e
+                for e != nil{
+                    next = e.Next()
+                    if time.Since(e.Value.(poolObject).when) > m.interval {
+                        queue.Remove(e)
+                        if m.Delete != nil {
+                            m.Delete(e.Value.(poolObject).obj)
+                        }
+                        e.Value = nil
+                    }
+                    e = next
+                }
+                timer = time.NewTimer(m.interval)
             }
         }
     }()
@@ -83,6 +81,14 @@ func (m *Manager) Start() (<-chan interface{}, chan<- interface{}) {
 
 func (m *Manager) Stop() {
     close(m.stop)
+}
+
+func (m *Manager) Init() {
+    m.Start()
+}
+
+func (m *Manager)Close() {
+    m.Stop()
 }
 
 func (m *Manager) Get() interface{} {
