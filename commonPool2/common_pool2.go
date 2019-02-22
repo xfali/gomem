@@ -12,7 +12,6 @@ package commonPool
 
 import (
     "container/list"
-    "fmt"
     "time"
 )
 
@@ -99,7 +98,8 @@ func (p *CommonPool) initDefault() {
     p.curCount = 0
 }
 
-func (p *CommonPool) Init() {
+//支持获取channel，但对factory的支持以及获取超时时间的配置项失效；支持回收channel，但对factory的支持失效，不建议使用
+func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
     p.initDefault()
     go func() {
         queue := list.New()
@@ -111,7 +111,7 @@ func (p *CommonPool) Init() {
         }
 
         for {
-            fmt.Println("main loop")
+            //fmt.Println("main loop")
             if queue.Len() == 0 {
                 o := p.make()
                 //到达对象池上限
@@ -126,7 +126,7 @@ func (p *CommonPool) Init() {
                                 got = true
                             }
                         case <-timer.C:
-                            fmt.Println("in sub loop")
+                            //fmt.Println("in sub loop")
                             e := queue.Front()
                             next := e
                             for e != nil && queue.Len() > p.MinIdle {
@@ -157,7 +157,6 @@ func (p *CommonPool) Init() {
             case p.getChan <- e.Value.(poolObject).obj:
                 queue.Remove(e)
             case <-timer.C:
-                fmt.Println("timeout")
                 e := queue.Front()
                 next := e
                 for e != nil && queue.Len() > p.MinIdle {
@@ -173,6 +172,8 @@ func (p *CommonPool) Init() {
             }
         }
     }()
+
+    return p.getChan, p.putChan
 }
 
 func (p *CommonPool) Close() {

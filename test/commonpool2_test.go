@@ -142,7 +142,7 @@ func TestCommonPool2_subloopTimeout(t *testing.T) {
 
     l := list.New()
     go func() {
-        time.Sleep(3*time.Second)
+        time.Sleep(3 * time.Second)
         pb.Put(l.Front().Value)
     }()
     for i := 0; i < 10; i++ {

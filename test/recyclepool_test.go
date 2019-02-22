@@ -13,7 +13,7 @@ package test
 import (
     "container/list"
     "fmt"
-    "gomem"
+    "gomem/recyclePool"
     "math/rand"
     "runtime"
     "testing"
@@ -21,19 +21,19 @@ import (
 )
 
 func TestPoolBuffer(t *testing.T) {
-    pb := gomem.New(
-        func() interface{} {
+    pb := recyclePool.RecyclePool{
+        New: func() interface{} {
             fmt.Println("create!")
             i := make([]byte, 1000)
             return i
         },
-        func(i interface{}) {
+        Delete: func(i interface{}) {
             fmt.Println("delete!")
             i = nil
         },
-        10*time.Second)
-    get, give := pb.Start()
-    defer pb.Stop()
+        Interval: 10 * time.Second}
+    get, give := pb.Init()
+    defer pb.Close()
 
     var m runtime.MemStats
     pool := make([]interface{}, 20)
@@ -63,17 +63,17 @@ func TestPoolBuffer(t *testing.T) {
 }
 
 func TestPoolBuffer2(t *testing.T) {
-    pb := gomem.New(
-        func() interface{} {
+    pb := recyclePool.RecyclePool{
+        New: func() interface{} {
             fmt.Println("create!")
             i := make([]byte, 1000)
             return i
         },
-        func(i interface{}) {
+        Delete: func(i interface{}) {
             fmt.Println("delete!")
             i = nil
         },
-        2*time.Second)
+        Interval: 2 * time.Second}
     get, give := pb.Start()
     defer pb.Stop()
 
@@ -82,12 +82,12 @@ func TestPoolBuffer2(t *testing.T) {
         buf := <-get
         l.PushBack(buf)
     }
-    time.Sleep(2*time.Second)
-    e:=l.Front()
-    for e!=nil {
+    time.Sleep(2 * time.Second)
+    e := l.Front()
+    for e != nil {
         give <- e.Value
         r := e
-        e=e.Next()
+        e = e.Next()
         l.Remove(r)
         time.Sleep(time.Second)
     }

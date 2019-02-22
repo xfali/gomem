@@ -8,20 +8,21 @@
  * Description: 
  */
 
-package gomem
+package recyclePool
 
 import (
     "container/list"
     "time"
 )
 
-type Manager struct {
-    get      chan interface{}
-    give     chan interface{}
-    stop     chan bool
-    interval time.Duration
+type RecyclePool struct {
+    Interval time.Duration
     New      func() interface{}
-    Delete  func(interface{})
+    Delete   func(interface{})
+
+    get  chan interface{}
+    give chan interface{}
+    stop chan bool
 }
 
 type poolObject struct {
@@ -29,20 +30,19 @@ type poolObject struct {
     obj  interface{}
 }
 
-func New(New func() interface{}, Delete func(interface{}), gcInterval time.Duration) *Manager {
-    return &Manager{
-        get:      make(chan interface{}),
-        give:     make(chan interface{}),
-        stop:     make(chan bool),
-        interval: gcInterval,
-        New:      New,
-        Delete:  Delete}
-}
+func (m *RecyclePool) Start() (<-chan interface{}, chan<- interface{}) {
+    m.get = make(chan interface{})
+    m.give = make(chan interface{})
+    m.stop = make(chan bool)
 
-func (m *Manager) Start() (<-chan interface{}, chan<- interface{}) {
     go func() {
         queue := list.New()
-        timer := time.NewTimer(m.interval)
+        var timer *time.Timer
+        if m.Interval == 0 {
+            timer = &time.Timer{C: make(chan time.Time)}
+        } else {
+            timer = time.NewTimer(m.Interval)
+        }
         for {
             if queue.Len() == 0 {
                 queue.PushBack(poolObject{when: time.Now(), obj: m.New()})
@@ -61,9 +61,9 @@ func (m *Manager) Start() (<-chan interface{}, chan<- interface{}) {
             case <-timer.C:
                 e := queue.Front()
                 next := e
-                for e != nil{
+                for e != nil {
                     next = e.Next()
-                    if time.Since(e.Value.(poolObject).when) > m.interval {
+                    if time.Since(e.Value.(poolObject).when) > m.Interval {
                         queue.Remove(e)
                         if m.Delete != nil {
                             m.Delete(e.Value.(poolObject).obj)
@@ -72,29 +72,26 @@ func (m *Manager) Start() (<-chan interface{}, chan<- interface{}) {
                     }
                     e = next
                 }
-                timer = time.NewTimer(m.interval)
+                timer = time.NewTimer(m.Interval)
             }
         }
     }()
     return m.get, m.give
 }
 
-func (m *Manager) Stop() {
+//支持直接使用获取、回收channel，可以使用
+func (m *RecyclePool) Init() (<-chan interface{}, chan<- interface{}) {
+    return m.Start()
+}
+
+func (m *RecyclePool) Close() {
     close(m.stop)
 }
 
-func (m *Manager) Init() {
-    m.Start()
-}
-
-func (m *Manager)Close() {
-    m.Stop()
-}
-
-func (m *Manager) Get() interface{} {
+func (m *RecyclePool) Get() interface{} {
     return <-m.get
 }
 
-func (m *Manager)Put(i interface{}) {
+func (m *RecyclePool) Put(i interface{}) {
     m.give <- i
 }

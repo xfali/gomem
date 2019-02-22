@@ -28,9 +28,10 @@ type CommonPool struct {
     init bool
 }
 
-func (p *CommonPool) Init() {
+//不支持获取channel、支持回收channel，禁止使用
+func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
     if p.init {
-        return
+        return p.queue, p.queue
     }
     p.init = true
     if p.MaxIdle == 0 {
@@ -49,6 +50,8 @@ func (p *CommonPool) Init() {
         p.queue = make(chan interface{}, p.MaxIdle)
     }
     p.curCount = 0
+
+    return p.queue, p.queue
 }
 
 func (p *CommonPool) Close() {
