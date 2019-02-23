@@ -31,7 +31,8 @@ func TestPoolBuffer(t *testing.T) {
             fmt.Println("delete!")
             i = nil
         },
-        Interval: 10 * time.Second}
+        MinEvictableIdleTimeMillis: 10*time.Second,
+        TimeBetweenEvictionRunsMillis: 10 * time.Second}
     get, give := pb.Init()
     defer pb.Close()
 
@@ -73,9 +74,10 @@ func TestPoolBuffer2(t *testing.T) {
             fmt.Println("delete!")
             i = nil
         },
-        Interval: 2 * time.Second}
-    get, give := pb.Start()
-    defer pb.Stop()
+        MinEvictableIdleTimeMillis: 2*time.Second,
+        TimeBetweenEvictionRunsMillis: 2 * time.Second}
+    get, give := pb.Init()
+    defer pb.Close()
 
     l := list.New()
     for i := 0; i < 100; i++ {

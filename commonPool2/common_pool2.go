@@ -16,10 +16,15 @@ import (
 )
 
 type PooledObjectFactory interface {
+    //对象被激活时调用
     ActivateObject(interface{})
+    //对象处于idle状态，被定时释放时调用
     DestroyObject(interface{})
+    //创建对象时调用
     MakeObject() interface{}
+    //对象回收之后进入idle状态时被调用
     PassivateObject(interface{})
+    //验证对象是否有效
     ValidateObject(interface{}) bool
 }
 
@@ -59,9 +64,20 @@ type CommonPool struct {
     init     bool
 }
 
+const (
+    IDLE       = iota //在池中，处于空闲状态
+    ALLOCATED         //被使用中
+    EVICTION          //正在被逐出器验证
+    VALIDATION        //正在验证
+    INVALID           //驱逐测试或验证失败并将被销毁
+    ABANDONED         //对象被客户端拿出后，长时间未返回池中，或没有调用 use 方法，即被标记为抛弃的
+    READY             //可以被给客户端使用
+)
+
 type poolObject struct {
-    when time.Time
-    obj  interface{}
+    when  time.Time
+    State int
+    obj   interface{}
 }
 
 func (p *CommonPool) initDefault() {
@@ -120,11 +136,11 @@ func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
                     got := false
                     for !got {
                         select {
-                        case <- p.stop:
+                        case <-p.stop:
                             return
                         case b := <-p.putChan:
                             if p.idleObj(b) {
-                                queue.PushBack(poolObject{when: time.Now(), obj: b})
+                                queue.PushBack(poolObject{time.Now(), IDLE, b})
                                 got = true
                             }
                         case <-timer.C:
@@ -133,7 +149,7 @@ func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
                             next := e
                             for e != nil && queue.Len() > p.MinIdle {
                                 next = e.Next()
-                                if time.Since(e.Value.(poolObject).when) > p.MinEvictableIdleTimeMillis {
+                                if p.MinEvictableIdleTimeMillis > 0 && time.Since(e.Value.(poolObject).when) > p.MinEvictableIdleTimeMillis {
                                     queue.Remove(e)
                                     p.destoryObj(e.Value.(poolObject).obj)
                                     e.Value = nil
@@ -144,17 +160,20 @@ func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
                         }
                     }
                 } else {
-                    queue.PushBack(poolObject{when: time.Now(), obj: o})
+                    queue.PushBack(poolObject{time.Now(), ALLOCATED, o})
                 }
             }
             e := queue.Front()
-            p.Factory.ActivateObject(e.Value.(poolObject).obj)
+            state := e.Value.(poolObject).State
+            if state == IDLE || state == ALLOCATED {
+                p.Factory.ActivateObject(e.Value.(poolObject).obj)
+            }
             select {
             case <-p.stop:
                 return
             case b := <-p.putChan:
                 if p.idleObj(b) {
-                    queue.PushBack(poolObject{when: time.Now(), obj: b})
+                    queue.PushBack(poolObject{ time.Now(), IDLE, b})
                 }
             case p.getChan <- e.Value.(poolObject).obj:
                 queue.Remove(e)
@@ -163,7 +182,7 @@ func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
                 next := e
                 for e != nil && queue.Len() > p.MinIdle {
                     next = e.Next()
-                    if time.Since(e.Value.(poolObject).when) > p.MinEvictableIdleTimeMillis {
+                    if p.MinEvictableIdleTimeMillis > 0 && time.Since(e.Value.(poolObject).when) > p.MinEvictableIdleTimeMillis {
                         queue.Remove(e)
                         p.destoryObj(e.Value.(poolObject).obj)
                         e.Value = nil

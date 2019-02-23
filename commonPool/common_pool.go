@@ -17,10 +17,15 @@ import (
 )
 
 type CommonPool struct {
+    //对象池缓存大小，当该值比MaxSize还小时，将自动调整为MaxSize。当回收的对象数量大于该值，则Put方法会阻塞
     MaxIdle     int
+    //对象池最大对象数
     MaxSize     int
+    //当资源耗尽时的等待资源时间
     WaitTimeout time.Duration
+    //创建对象函数
     New         func() interface{}
+
     queue       chan interface{}
     curCount    int
     mutex       sync.Mutex

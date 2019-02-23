@@ -16,8 +16,13 @@ import (
 )
 
 type RecyclePool struct {
-    Interval time.Duration
+    //对象空闲的最小时间，达到此值后空闲对象将可能会被移除。-1 表示不移除；默认 30 分钟
+    MinEvictableIdleTimeMillis time.Duration
+    //回收资源协程的执行周期，默认 -1 表示不定时回收
+    TimeBetweenEvictionRunsMillis time.Duration
+    //创建对象函数
     New      func() interface{}
+    //释放对象函数
     Delete   func(interface{})
 
     get  chan interface{}
@@ -30,7 +35,14 @@ type poolObject struct {
     obj  interface{}
 }
 
-func (m *RecyclePool) Start() (<-chan interface{}, chan<- interface{}) {
+//支持直接使用获取、回收channel，可以使用
+func (m *RecyclePool) Init() (<-chan interface{}, chan<- interface{}) {
+    if m.MinEvictableIdleTimeMillis == 0 {
+        m.MinEvictableIdleTimeMillis = 30*time.Minute
+    }
+    if m.TimeBetweenEvictionRunsMillis == 0 {
+        m.TimeBetweenEvictionRunsMillis = -1
+    }
     m.get = make(chan interface{})
     m.give = make(chan interface{})
     m.stop = make(chan bool)
@@ -38,10 +50,10 @@ func (m *RecyclePool) Start() (<-chan interface{}, chan<- interface{}) {
     go func() {
         queue := list.New()
         var timer *time.Timer
-        if m.Interval == 0 {
+        if m.TimeBetweenEvictionRunsMillis <= 0 {
             timer = &time.Timer{C: make(chan time.Time)}
         } else {
-            timer = time.NewTimer(m.Interval)
+            timer = time.NewTimer(m.TimeBetweenEvictionRunsMillis)
         }
         for {
             if queue.Len() == 0 {
@@ -63,7 +75,7 @@ func (m *RecyclePool) Start() (<-chan interface{}, chan<- interface{}) {
                 next := e
                 for e != nil {
                     next = e.Next()
-                    if time.Since(e.Value.(poolObject).when) > m.Interval {
+                    if m.MinEvictableIdleTimeMillis > 0 && time.Since(e.Value.(poolObject).when) > m.MinEvictableIdleTimeMillis  {
                         queue.Remove(e)
                         if m.Delete != nil {
                             m.Delete(e.Value.(poolObject).obj)
@@ -72,16 +84,11 @@ func (m *RecyclePool) Start() (<-chan interface{}, chan<- interface{}) {
                     }
                     e = next
                 }
-                timer = time.NewTimer(m.Interval)
+                timer = time.NewTimer(m.TimeBetweenEvictionRunsMillis)
             }
         }
     }()
     return m.get, m.give
-}
-
-//支持直接使用获取、回收channel，可以使用
-func (m *RecyclePool) Init() (<-chan interface{}, chan<- interface{}) {
-    return m.Start()
 }
 
 func (m *RecyclePool) Close() {
