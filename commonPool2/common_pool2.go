@@ -120,6 +120,8 @@ func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
                     got := false
                     for !got {
                         select {
+                        case <- p.stop:
+                            return
                         case b := <-p.putChan:
                             if p.idleObj(b) {
                                 queue.PushBack(poolObject{when: time.Now(), obj: b})
