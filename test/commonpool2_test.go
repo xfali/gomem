@@ -33,7 +33,7 @@ func (f *b) ValidateObject(i interface{}) bool {
 }
 
 func TestCommonPool2(t *testing.T) {
-    //f := commonPool2.DefaultPooledObjectFactory(func() interface{} {
+    //f := commonPool2.DummyFactory(func() interface{} {
     //    fmt.Println("create!")
     //    return "test"
     //})
@@ -81,7 +81,7 @@ func TestCommonPool2(t *testing.T) {
 }
 
 func TestCommonPool2_2(t *testing.T) {
-    //f := commonPool2.DefaultPooledObjectFactory(func() interface{} {
+    //f := commonPool2.DummyFactory(func() interface{} {
     //    fmt.Println("create!")
     //    return "test"
     //})
@@ -119,7 +119,7 @@ func TestCommonPool2_2(t *testing.T) {
 }
 
 func TestCommonPool2_subloopTimeout(t *testing.T) {
-    //f := commonPool2.DefaultPooledObjectFactory(func() interface{} {
+    //f := commonPool2.DummyFactory(func() interface{} {
     //    fmt.Println("create!")
     //    return "test"
     //})

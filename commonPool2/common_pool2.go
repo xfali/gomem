@@ -271,10 +271,46 @@ func (p *CommonPool) Put(i interface{}) {
     p.putChan <- i
 }
 
-type DefaultPooledObjectFactory func() interface{}
+type DummyFactory func() interface{}
 
-func (f DefaultPooledObjectFactory) ActivateObject(interface{})      {}
-func (f DefaultPooledObjectFactory) DestroyObject(interface{})       {}
-func (f DefaultPooledObjectFactory) MakeObject() interface{}         { return f() }
-func (f DefaultPooledObjectFactory) PassivateObject(interface{})     {}
-func (f DefaultPooledObjectFactory) ValidateObject(interface{}) bool { return true }
+func (f *DummyFactory) ActivateObject(interface{})      {}
+func (f *DummyFactory) DestroyObject(interface{})       {}
+func (f *DummyFactory) MakeObject() interface{}         { return (*f)() }
+func (f *DummyFactory) PassivateObject(interface{})     {}
+func (f *DummyFactory) ValidateObject(interface{}) bool { return true }
+
+type DefaultFactory struct {
+    Activate  func(interface{})
+    Destroy   func(interface{})
+    Make      func() interface{}
+    Passivate func(interface{})
+    Validate  func(interface{}) bool
+}
+
+func (f *DefaultFactory) ActivateObject(i interface{}) {
+    if f.Activate != nil {
+        f.Activate(i)
+    }
+}
+func (f *DefaultFactory) DestroyObject(i interface{}) {
+    if f.Destroy != nil {
+        f.Destroy(i)
+    }
+}
+func (f *DefaultFactory) MakeObject() interface{} {
+    if f.Make == nil {
+        panic("Make func is nil")
+    }
+    return f.Make()
+}
+func (f *DefaultFactory) PassivateObject(i interface{}) {
+    if f.Passivate != nil {
+        f.Passivate(i)
+    }
+}
+func (f *DefaultFactory) ValidateObject(i interface{}) bool {
+    if f.Validate != nil {
+        return f.Validate(i)
+    }
+    return true
+}
