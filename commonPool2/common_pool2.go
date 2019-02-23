@@ -76,7 +76,7 @@ const (
 
 type poolObject struct {
     when  time.Time
-    State int
+    state int
     obj   interface{}
 }
 
@@ -140,7 +140,7 @@ func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
                             return
                         case b := <-p.putChan:
                             if p.idleObj(b) {
-                                queue.PushBack(poolObject{time.Now(), IDLE, b})
+                                queue.PushBack(&poolObject{time.Now(), IDLE, b})
                                 got = true
                             }
                         case <-timer.C:
@@ -149,9 +149,9 @@ func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
                             next := e
                             for e != nil && queue.Len() > p.MinIdle {
                                 next = e.Next()
-                                if p.MinEvictableIdleTimeMillis > 0 && time.Since(e.Value.(poolObject).when) > p.MinEvictableIdleTimeMillis {
+                                if p.MinEvictableIdleTimeMillis > 0 && time.Since(e.Value.(*poolObject).when) > p.MinEvictableIdleTimeMillis {
                                     queue.Remove(e)
-                                    p.destoryObj(e.Value.(poolObject).obj)
+                                    p.destoryObj(e.Value.(*poolObject).obj)
                                     e.Value = nil
                                 }
                                 e = next
@@ -160,31 +160,32 @@ func (p *CommonPool) Init() (<-chan interface{}, chan<- interface{}) {
                         }
                     }
                 } else {
-                    queue.PushBack(poolObject{time.Now(), ALLOCATED, o})
+                    queue.PushBack(&poolObject{time.Now(), ALLOCATED, o})
                 }
             }
             e := queue.Front()
-            state := e.Value.(poolObject).State
-            if state == IDLE || state == ALLOCATED {
-                p.Factory.ActivateObject(e.Value.(poolObject).obj)
+            po := e.Value.(*poolObject)
+            if po.state == IDLE || po.state == ALLOCATED {
+                p.Factory.ActivateObject(po.obj)
+                po.state = READY
             }
             select {
             case <-p.stop:
                 return
             case b := <-p.putChan:
                 if p.idleObj(b) {
-                    queue.PushBack(poolObject{ time.Now(), IDLE, b})
+                    queue.PushBack(&poolObject{time.Now(), IDLE, b})
                 }
-            case p.getChan <- e.Value.(poolObject).obj:
+            case p.getChan <- e.Value.(*poolObject).obj:
                 queue.Remove(e)
             case <-timer.C:
                 e := queue.Front()
                 next := e
                 for e != nil && queue.Len() > p.MinIdle {
                     next = e.Next()
-                    if p.MinEvictableIdleTimeMillis > 0 && time.Since(e.Value.(poolObject).when) > p.MinEvictableIdleTimeMillis {
+                    if p.MinEvictableIdleTimeMillis > 0 && time.Since(e.Value.(*poolObject).when) > p.MinEvictableIdleTimeMillis {
                         queue.Remove(e)
-                        p.destoryObj(e.Value.(poolObject).obj)
+                        p.destoryObj(e.Value.(*poolObject).obj)
                         e.Value = nil
                     }
                     e = next

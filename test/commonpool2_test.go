@@ -94,10 +94,10 @@ func TestCommonPool2_2(t *testing.T) {
         MinEvictableIdleTimeMillis:    1 * time.Second,
         Factory:                       &f,
         MaxWaitMillis:                 time.Second * 10,
-        TestOnReturn:                  true,
-        TestWhileIdle:                 true,
-        TestOnBorrow:                  true,
-        TestOnCreate:                  true,
+        //TestOnReturn:                  true,
+        //TestWhileIdle:                 true,
+        //TestOnBorrow:                  true,
+        //TestOnCreate:                  true,
     }
     pb.Init()
     defer pb.Close()
