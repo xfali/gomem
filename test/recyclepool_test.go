@@ -13,7 +13,7 @@ package test
 import (
     "container/list"
     "fmt"
-    "gomem/recyclePool"
+    "github.com/xfali/gomem/recyclePool"
     "math/rand"
     "runtime"
     "testing"

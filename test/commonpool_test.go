@@ -13,7 +13,7 @@ package test
 import (
     "container/list"
     "fmt"
-    "gomem/commonPool"
+    "github.com/xfali/gomem/commonPool"
     "testing"
     "time"
 )
